@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Search Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #e8ecf1; min-height: 100vh; }
+
+  /* Layout */
+  .container { max-width: 1600px; margin: 0 auto; padding: 0 28px; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 20px 0 12px; }
+  .header h1 { font-size: 26px; font-weight: 700; color: #1a1a1a; }
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+  .save-indicator { color: #22c55e; font-size: 14px; padding: 0 8px; display: none; }
+  .save-indicator.show { display: inline; }
+
+  .btn { padding: 8px 18px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; font-size: 14px; cursor: pointer; font-weight: 500; color: #374151; transition: background 0.15s; }
+  .btn:hover { background: #f3f4f6; }
+  .btn-primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .btn-primary:hover { background: #333; }
+  .btn-active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .btn-active:hover { background: #1d4ed8; }
+  .btn-icon { padding: 8px 10px; font-size: 16px; }
+
+  /* View toggle */
+  .view-toggle .btn { border-radius: 0; border-right: none; }
+  .view-toggle .btn:first-child { border-radius: 8px 0 0 8px; }
+  .view-toggle .btn:last-child { border-radius: 0 8px 8px 0; border-right: 1px solid #d1d5db; }
+
+  /* Board */
+  .board { display: flex; gap: 16px; padding: 8px 0 28px; overflow-x: auto; align-items: flex-start; }
+  .column { flex: 1; min-width: 220px; display: flex; flex-direction: column; }
+  .column-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 10px 10px 0 0; border: 1px solid #e5e7eb; border-bottom: none; }
+  .column-header .label { font-size: 14px; font-weight: 600; padding: 2px 10px; border-radius: 4px; }
+  .column-header .count { font-size: 14px; color: #6b7280; }
+
+  .column-body { background: #f3f4f6; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px; padding: 10px; min-height: 120px; }
+  .column-body.drag-over { background: #dbeafe; }
+  .column-empty { color: #9ca3af; font-size: 14px; text-align: center; padding: 24px 0; }
+
+  .add-btn { display: flex; align-items: center; gap: 4px; padding: 10px; color: #6b7280; font-size: 14px; cursor: pointer; border: none; background: none; width: 100%; }
+  .add-btn:hover { color: #374151; }
+
+  /* Column colors */
+  .col-queue .label { background: #e5e7eb; color: #374151; }
+  .col-queue .column-header { background: #f9fafb; }
+  .col-recruiter .label { background: #bfdbfe; color: #1e40af; }
+  .col-recruiter .column-header { background: #eff6ff; }
+  .col-technical .label { background: #fef08a; color: #854d0e; }
+  .col-technical .column-header { background: #fefce8; }
+  .col-onsite .label { background: #fed7aa; color: #9a3412; }
+  .col-onsite .column-header { background: #fff7ed; }
+  .col-offer .label { background: #bbf7d0; color: #166534; }
+  .col-offer .column-header { background: #f0fdf4; }
+
+  /* Cards */
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: grab; transition: box-shadow 0.15s, transform 0.15s; position: relative; }
+  .card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .card.dragging { opacity: 0.5; transform: rotate(2deg); }
+  .card-company { font-weight: 600; font-size: 14px; color: #1a1a1a; margin-bottom: 2px; }
+  .card-role { font-size: 13px; color: #6b7280; margin-bottom: 6px; }
+  .card-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+  .card-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #f3f4f6; color: #6b7280; }
+  .card-date { font-size: 11px; color: #9ca3af; }
+  .card-actions { position: absolute; top: 8px; right: 8px; display: none; gap: 4px; }
+  .card:hover .card-actions { display: flex; }
+  .card-action-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 4px; color: #9ca3af; }
+  .card-action-btn:hover { background: #f3f4f6; color: #374151; }
+  .card-notes { font-size: 12px; color: #9ca3af; margin-top: 6px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* List View */
+  .list-view { display: none; padding: 8px 0 28px; }
+  .list-view table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .list-view th { text-align: left; padding: 12px 16px; background: #f9fafb; font-size: 13px; font-weight: 600; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+  .list-view td { padding: 10px 16px; font-size: 14px; border-bottom: 1px solid #f3f4f6; }
+  .list-view tr:hover td { background: #f9fafb; }
+  .list-view select { padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; }
+  .status-badge { padding: 2px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: #fff; border-radius: 14px; padding: 28px; width: 480px; max-width: 90vw; max-height: 90vh; overflow-y: auto; }
+  .modal h2 { font-size: 20px; margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-family: inherit; }
+  .form-group textarea { height: 80px; resize: vertical; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; }
+  .btn-danger { background: #fee2e2; color: #dc2626; border-color: #fecaca; }
+  .btn-danger:hover { background: #fecaca; }
+
+  /* Settings modal */
+  .settings-section { margin-bottom: 20px; }
+  .settings-section h3 { font-size: 15px; margin-bottom: 8px; }
+  .column-list-item { display: flex; align-items: center; gap: 8px; padding: 8px; background: #f9fafb; border-radius: 6px; margin-bottom: 4px; }
+  .column-list-item input { flex: 1; }
+</style>
+</head>
+<body>
+
+<div class="container">
+<div class="header">
+  <h1>Job Search Dashboard</h1>
+  <div class="header-actions">
+    <span class="save-indicator" id="saveIndicator">&#10003; Saved</span>
+    <div class="view-toggle">
+      <button class="btn btn-active" id="kanbanBtn" onclick="setView('kanban')">Kanban</button>
+      <button class="btn" id="listBtn" onclick="setView('list')">List</button>
+    </div>
+    <button class="btn" onclick="exportData()">Export</button>
+    <button class="btn" onclick="document.getElementById('importInput').click()">Import</button>
+    <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+    <button class="btn btn-icon" onclick="openSettings()">&#9881;</button>
+    <button class="btn btn-primary" onclick="openAddModal()">Add Application</button>
+  </div>
+</div>
+
+<div class="board" id="board"></div>
+
+<div class="list-view" id="listView"></div>
+</div><!-- end container -->
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="appModal">
+  <div class="modal">
+    <h2 id="modalTitle">Add Application</h2>
+    <input type="hidden" id="editId">
+    <div class="form-group">
+      <label>Company *</label>
+      <input type="text" id="fieldCompany" placeholder="e.g. Google">
+    </div>
+    <div class="form-group">
+      <label>Role *</label>
+      <input type="text" id="fieldRole" placeholder="e.g. Senior Software Engineer">
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="fieldStatus"></select>
+    </div>
+    <div class="form-group">
+      <label>Date Applied</label>
+      <input type="date" id="fieldDate">
+    </div>
+    <div class="form-group">
+      <label>Location</label>
+      <input type="text" id="fieldLocation" placeholder="e.g. San Francisco, CA">
+    </div>
+    <div class="form-group">
+      <label>Salary Range</label>
+      <input type="text" id="fieldSalary" placeholder="e.g. $150k-$200k">
+    </div>
+    <div class="form-group">
+      <label>URL</label>
+      <input type="url" id="fieldUrl" placeholder="Job posting link">
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="fieldNotes" placeholder="Any notes about this application..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-danger" id="deleteBtn" style="display:none;margin-right:auto" onclick="deleteApp()">Delete</button>
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveApp()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>Settings</h2>
+    <div class="settings-section">
+      <h3>Columns</h3>
+      <p style="font-size:13px;color:#6b7280;margin-bottom:10px">Manage your pipeline stages. Drag to reorder.</p>
+      <div id="columnList"></div>
+      <button class="btn" style="margin-top:8px" onclick="addColumn()">+ Add Column</button>
+    </div>
+    <div class="form-actions">
+      <button class="btn" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'job_search_dashboard';
+const DEFAULT_COLUMNS = [
+  { id: 'queue', name: 'Queue', color: 'col-queue' },
+  { id: 'recruiter', name: 'Recruiter Screen', color: 'col-recruiter' },
+  { id: 'technical', name: 'Technical Screen', color: 'col-technical' },
+  { id: 'onsite', name: 'Onsite Loop', color: 'col-onsite' },
+  { id: 'offer', name: 'Offer', color: 'col-offer' },
+];
+
+const COLOR_MAP = {
+  'col-queue': { bg: '#f9fafb', label_bg: '#e5e7eb', label_color: '#374151' },
+  'col-recruiter': { bg: '#eff6ff', label_bg: '#bfdbfe', label_color: '#1e40af' },
+  'col-technical': { bg: '#fefce8', label_bg: '#fef08a', label_color: '#854d0e' },
+  'col-onsite': { bg: '#fff7ed', label_bg: '#fed7aa', label_color: '#9a3412' },
+  'col-offer': { bg: '#f0fdf4', label_bg: '#bbf7d0', label_color: '#166534' },
+};
+const COLOR_OPTIONS = Object.keys(COLOR_MAP);
+
+let state = { columns: DEFAULT_COLUMNS, apps: [] };
+
+async function loadState() {
+  try {
+    const res = await fetch('/api/data');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.columns && data.apps) return data;
+    }
+  } catch {}
+  // Fallback to localStorage
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) return JSON.parse(saved);
+  return { columns: DEFAULT_COLUMNS, apps: [] };
+}
+
+async function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try {
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state, null, 2),
+    });
+  } catch {}
+  const indicator = document.getElementById('saveIndicator');
+  indicator.classList.add('show');
+  setTimeout(() => indicator.classList.remove('show'), 1500);
+}
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+// --- Rendering ---
+function render() {
+  renderBoard();
+  renderListView();
+  renderStatusSelect();
+}
+
+function renderBoard() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  state.columns.forEach(col => {
+    const apps = state.apps.filter(a => a.status === col.id);
+    const colors = COLOR_MAP[col.color] || COLOR_MAP['col-queue'];
+    const div = document.createElement('div');
+    div.className = 'column';
+    div.innerHTML = `
+      <div class="column-header ${col.color}" style="background:${colors.bg}">
+        <span class="label" style="background:${colors.label_bg};color:${colors.label_color}">${col.name}</span>
+        <span class="count">${apps.length}</span>
+      </div>
+      <div class="column-body" data-status="${col.id}"
+           ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        ${apps.length === 0 ? '<div class="column-empty">No applications</div>' : ''}
+        ${apps.map(a => renderCard(a)).join('')}
+      </div>
+      <button class="add-btn" onclick="openAddModal('${col.id}')">+ Add</button>
+    `;
+    board.appendChild(div);
+  });
+}
+
+function renderCard(app) {
+  const dateStr = app.date ? new Date(app.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+  return `
+    <div class="card" draggable="true" data-id="${app.id}"
+         ondragstart="onDragStart(event)" ondragend="onDragEnd(event)" ondblclick="openEditModal('${app.id}')">
+      <div class="card-actions">
+        <button class="card-action-btn" onclick="openEditModal('${app.id}')" title="Edit">&#9998;</button>
+      </div>
+      <div class="card-company">${escHtml(app.company)}</div>
+      <div class="card-role">${escHtml(app.role)}</div>
+      <div class="card-meta">
+        ${app.location ? `<span class="card-tag">${escHtml(app.location)}</span>` : ''}
+        ${app.salary ? `<span class="card-tag">${escHtml(app.salary)}</span>` : ''}
+        ${dateStr ? `<span class="card-date">${dateStr}</span>` : ''}
+      </div>
+      ${app.notes ? `<div class="card-notes">${escHtml(app.notes)}</div>` : ''}
+    </div>`;
+}
+
+function renderListView() {
+  const lv = document.getElementById('listView');
+  const colMap = Object.fromEntries(state.columns.map(c => [c.id, c]));
+  const sorted = [...state.apps].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  lv.innerHTML = `<table>
+    <thead><tr><th>Company</th><th>Role</th><th>Status</th><th>Date</th><th>Location</th><th>Salary</th><th></th></tr></thead>
+    <tbody>
+    ${sorted.length === 0 ? '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:32px">No applications yet</td></tr>' : ''}
+    ${sorted.map(a => {
+      const col = colMap[a.status] || state.columns[0];
+      const colors = COLOR_MAP[col.color] || COLOR_MAP['col-queue'];
+      return `<tr>
+        <td><strong>${escHtml(a.company)}</strong></td>
+        <td>${escHtml(a.role)}</td>
+        <td>
+          <select onchange="moveApp('${a.id}', this.value)" style="background:${colors.label_bg};color:${colors.label_color};border-color:${colors.label_bg}">
+            ${state.columns.map(c => `<option value="${c.id}" ${c.id === a.status ? 'selected' : ''}>${c.name}</option>`).join('')}
+          </select>
+        </td>
+        <td>${a.date || '-'}</td>
+        <td>${escHtml(a.location || '-')}</td>
+        <td>${escHtml(a.salary || '-')}</td>
+        <td><button class="card-action-btn" onclick="openEditModal('${a.id}')">&#9998;</button></td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>`;
+}
+
+function renderStatusSelect() {
+  const sel = document.getElementById('fieldStatus');
+  sel.innerHTML = state.columns.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+}
+
+// --- Drag & Drop ---
+let dragId = null;
+function onDragStart(e) {
+  dragId = e.target.closest('.card').dataset.id;
+  e.target.closest('.card').classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDragEnd(e) {
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('dragging'));
+  document.querySelectorAll('.column-body').forEach(c => c.classList.remove('drag-over'));
+}
+function onDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const newStatus = e.currentTarget.dataset.status;
+  if (dragId && newStatus) {
+    moveApp(dragId, newStatus);
+  }
+  dragId = null;
+}
+
+async function moveApp(id, newStatus) {
+  const app = state.apps.find(a => a.id === id);
+  if (app) {
+    app.status = newStatus;
+    await saveState();
+    render();
+  }
+}
+
+// --- View Toggle ---
+function setView(view) {
+  const kanbanBtn = document.getElementById('kanbanBtn');
+  const listBtn = document.getElementById('listBtn');
+  const board = document.getElementById('board');
+  const listView = document.getElementById('listView');
+  if (view === 'kanban') {
+    board.style.display = 'flex'; listView.style.display = 'none';
+    kanbanBtn.classList.add('btn-active'); listBtn.classList.remove('btn-active');
+  } else {
+    board.style.display = 'none'; listView.style.display = 'block';
+    listBtn.classList.add('btn-active'); kanbanBtn.classList.remove('btn-active');
+  }
+}
+
+// --- Add / Edit Modal ---
+function openAddModal(status) {
+  document.getElementById('modalTitle').textContent = 'Add Application';
+  document.getElementById('editId').value = '';
+  document.getElementById('fieldCompany').value = '';
+  document.getElementById('fieldRole').value = '';
+  document.getElementById('fieldStatus').value = status || state.columns[0]?.id || '';
+  document.getElementById('fieldDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('fieldLocation').value = '';
+  document.getElementById('fieldSalary').value = '';
+  document.getElementById('fieldUrl').value = '';
+  document.getElementById('fieldNotes').value = '';
+  document.getElementById('deleteBtn').style.display = 'none';
+  document.getElementById('appModal').classList.add('active');
+  setTimeout(() => document.getElementById('fieldCompany').focus(), 100);
+}
+
+function openEditModal(id) {
+  const app = state.apps.find(a => a.id === id);
+  if (!app) return;
+  document.getElementById('modalTitle').textContent = 'Edit Application';
+  document.getElementById('editId').value = app.id;
+  document.getElementById('fieldCompany').value = app.company;
+  document.getElementById('fieldRole').value = app.role;
+  document.getElementById('fieldStatus').value = app.status;
+  document.getElementById('fieldDate').value = app.date || '';
+  document.getElementById('fieldLocation').value = app.location || '';
+  document.getElementById('fieldSalary').value = app.salary || '';
+  document.getElementById('fieldUrl').value = app.url || '';
+  document.getElementById('fieldNotes').value = app.notes || '';
+  document.getElementById('deleteBtn').style.display = 'inline-block';
+  document.getElementById('appModal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('appModal').classList.remove('active');
+}
+
+async function saveApp() {
+  const company = document.getElementById('fieldCompany').value.trim();
+  const role = document.getElementById('fieldRole').value.trim();
+  if (!company || !role) { alert('Company and Role are required.'); return; }
+
+  const editId = document.getElementById('editId').value;
+  const data = {
+    company,
+    role,
+    status: document.getElementById('fieldStatus').value,
+    date: document.getElementById('fieldDate').value,
+    location: document.getElementById('fieldLocation').value.trim(),
+    salary: document.getElementById('fieldSalary').value.trim(),
+    url: document.getElementById('fieldUrl').value.trim(),
+    notes: document.getElementById('fieldNotes').value.trim(),
+  };
+
+  if (editId) {
+    const app = state.apps.find(a => a.id === editId);
+    if (app) Object.assign(app, data);
+  } else {
+    state.apps.push({ id: generateId(), ...data });
+  }
+  await saveState();
+  closeModal();
+  render();
+}
+
+async function deleteApp() {
+  const id = document.getElementById('editId').value;
+  if (!id) return;
+  if (!confirm('Delete this application?')) return;
+  state.apps = state.apps.filter(a => a.id !== id);
+  await saveState();
+  closeModal();
+  render();
+}
+
+// --- Export / Import ---
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `job-search-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.columns && data.apps) {
+        state = data;
+        await saveState();
+        render();
+      } else {
+        alert('Invalid file format.');
+      }
+    } catch { alert('Failed to parse file.'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// --- Settings ---
+function openSettings() {
+  const list = document.getElementById('columnList');
+  list.innerHTML = state.columns.map((col, i) => `
+    <div class="column-list-item" data-idx="${i}">
+      <select onchange="this.parentElement.dataset.color=this.value" style="width:40px;padding:4px">
+        ${COLOR_OPTIONS.map(c => `<option value="${c}" ${c === col.color ? 'selected' : ''} style="background:${COLOR_MAP[c].label_bg}">&bull;</option>`).join('')}
+      </select>
+      <input type="text" value="${escHtml(col.name)}" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px">
+      <button class="card-action-btn" onclick="this.parentElement.remove()" title="Remove">&times;</button>
+    </div>
+  `).join('');
+  document.getElementById('settingsModal').classList.add('active');
+}
+
+function addColumn() {
+  const list = document.getElementById('columnList');
+  const div = document.createElement('div');
+  div.className = 'column-list-item';
+  div.dataset.color = 'col-queue';
+  div.innerHTML = `
+    <select onchange="this.parentElement.dataset.color=this.value" style="width:40px;padding:4px">
+      ${COLOR_OPTIONS.map(c => `<option value="${c}" style="background:${COLOR_MAP[c].label_bg}">&bull;</option>`).join('')}
+    </select>
+    <input type="text" value="" placeholder="Column name" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px">
+    <button class="card-action-btn" onclick="this.parentElement.remove()" title="Remove">&times;</button>
+  `;
+  list.appendChild(div);
+}
+
+async function saveSettings() {
+  const items = document.querySelectorAll('#columnList .column-list-item');
+  const newCols = [];
+  items.forEach((item, i) => {
+    const name = item.querySelector('input').value.trim();
+    if (!name) return;
+    const color = item.dataset.color || item.querySelector('select')?.value || 'col-queue';
+    const existing = state.columns[item.dataset.idx];
+    newCols.push({ id: existing?.id || generateId(), name, color });
+  });
+  state.columns = newCols;
+  await saveState();
+  closeSettings();
+  render();
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('active');
+}
+
+// --- Util ---
+function escHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+// Close modals on overlay click
+document.getElementById('appModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.getElementById('settingsModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSettings(); });
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeSettings(); }
+});
+
+// Init
+(async () => {
+  state = await loadState();
+  render();
+})();
+</script>
+</body>
+</html>
